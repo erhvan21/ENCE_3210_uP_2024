@@ -2,21 +2,19 @@
 #define RED_LED   5
 #define BUTTON_1  2
 
-#define TIMER1_COMPARE_VALUE 6250
-#define TIMER2_COMPARE_VALUE
+#define TIMER1_COMPARE_VALUE 25000
 
-int gCounter = 0;
+volatile int gCounter = 0;
 bool gPrint = false;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(BUTTON_1, INPUT);
-  pinMode(GREEN_LED, OUTPUT);
-  pinMode(RED_LED, OUTPUT);
+  configurePins();
   configureTimers();
 }
 
 void loop() {
+  //Main task, prints to serial
   if(gPrint){
     Serial.print("Counter: ");
     Serial.println(gCounter/10);
@@ -24,40 +22,48 @@ void loop() {
   }
 }
 
+//contains setup for timers
 void configureTimers(){
+  //Turn off interrupts
   noInterrupts();
 
-  //Timer/Counter 1 Control Register A/B
+  //reset Timer/Counter 1 Control Register A/B
   TCCR1A = 0;
   TCCR1B = 0;
 
-  TCCR2A = 0;
-  TCCR2B = 0;
-
-  //Output Compare registers
+  //set Output Compare register value
   OCR1A = TIMER1_COMPARE_VALUE;
-  OCR2A = TIMER2_COMPARE_VALUE;
 
   //Config settings for timer
-  TCCR1B |= (1<<WGM12);
-  TCCR1B |= (1<<CS12);
-
-  TCCR2A |= (1<<WGM11);
-  TCCR2B |= (1<<CS21);
-
+  TCCR1B |= (1<<WGM12); //CTC mode
+  TCCR1B |= (1<<CS11); //64 prescalar
+  TCCR1B |= (1<<CS10);
 
   //enable interrupts from output compare registers A and B
   TIMSK1 |= (1<<OCIE1A);
   interrupts();
 }
 
-//Interrupt
+//contains setup for pins
+void configurePins(){
+  pinMode(BUTTON_1, INPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+}
+
+//Interrupt, 10 Hz
 ISR(TIMER1_COMPA_vect){
-  gCounter++;
+
+  //Task 2, write to RED_LED
   digitalWrite(RED_LED, digitalRead(BUTTON_1));
+  gCounter++;
+
+  //Task 1, 1 Hz, toggle GREEN_LED
   if(gCounter%10 == 0){
     digitalWrite(GREEN_LED, !digitalRead(GREEN_LED));
   }
+
+  //Main task, 0.333 Hz, raise print flag
   if(gCounter%30 == 0){
     gPrint = true;
   }
